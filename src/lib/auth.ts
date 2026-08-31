@@ -20,15 +20,21 @@ export const EMAIL_COOKIE = "futeservices_email";
 export const SESSION_ID_COOKIE = "futeservices_session_id";
 export const AUTH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days, in seconds
 export const LOGIN_PATH = "/login";
-/** Lead lookup + device picker, between the login and the showcase.
- * Staff-only. */
+/** Intro splash, public and shown before login on every visit. */
+export const INTRO_PATH = "/";
+/** Lead lookup/capture, where sales staff start a presentation. Staff-only. */
 export const SESSION_START_PATH = "/session/start";
-/** VR-tour backdrop + property showcase — the end of the staff flow. Staff-only. */
+/** Earth-approach transition, reached once a lead is active. Staff-only. */
+export const SPACE_PATH = "/space";
+/** VR-tour backdrop + property showcase the Earth hands off to. Staff-only. */
 export const DASHBOARD_PATH = "/dashboard";
 /** Admin-only reporting dashboard, covering every session and every role. */
 export const ADMIN_PATH = "/admin/dashboard";
 /** Sales-manager-only reporting dashboard, scoped to their own team's sessions. */
 export const MANAGER_PATH = "/manager/dashboard";
+/** A sales staff member's own activity, self-viewable so tracking doesn't
+ * read as a one-way mirror only admins/managers can see through. Staff-only. */
+export const MY_ACTIVITY_PATH = "/my-activity";
 
 /** Where a freshly signed-in (or already-authed) user of this role lands. */
 export function landingPathForRole(role: Role): string {
@@ -40,11 +46,6 @@ export function landingPathForRole(role: Role): string {
 export type LoginResult =
   | { ok: true; role: Role; name: string; email: string; sessionId: string }
   | { ok: false; error: string };
-
-/** What the caller is signing in with. Staff send the email alone — Sperto is
- * what verifies it (see src/app/api/login/route.ts). Admins and managers add a
- * password, because their dashboards are the ones worth protecting. */
-export type LoginCredentials = { email: string; password?: string };
 
 /** What /api/login's body may contain — every field optional, because a
  * failing or crashed route is exactly the case this type exists to survive.
@@ -64,7 +65,7 @@ type LoginResponse = Partial<{
  * Surfaces the server's actual message on failure (e.g. "Your access has
  * been suspended...") rather than collapsing every failure into one
  * generic string. */
-export async function login(credentials: LoginCredentials): Promise<LoginResult> {
+export async function login(email: string, opts: { password: string } | { demo: true }): Promise<LoginResult> {
   // Never throws, and never hangs. A failed sign-in is an ordinary outcome
   // the form already knows how to show, so every way this can go wrong — the
   // server down, a crashed route answering with an empty body, a body that
@@ -76,11 +77,11 @@ export async function login(credentials: LoginCredentials): Promise<LoginResult>
     const res = await fetchWithTimeout("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ email, ...opts }),
     });
     const data = await readJsonSafe<LoginResponse>(res);
     if (!res.ok) {
-      return { ok: false, error: data?.error ?? "Sign-in failed. Check the email and try again." };
+      return { ok: false, error: data?.error ?? "Incorrect email or password." };
     }
     // A 200 with a body we can't use is still a failed sign-in: letting it
     // through would hand the app a session with no role and break the
@@ -88,13 +89,7 @@ export async function login(credentials: LoginCredentials): Promise<LoginResult>
     if (!data?.role || !data.name || !data.email || !data.sessionId) {
       return { ok: false, error: "Sign-in didn't complete. Please try again." };
     }
-    return {
-      ok: true,
-      role: data.role,
-      name: data.name,
-      email: data.email,
-      sessionId: data.sessionId,
-    };
+    return { ok: true, role: data.role, name: data.name, email: data.email, sessionId: data.sessionId };
   } catch {
     return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
   }

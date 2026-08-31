@@ -6,7 +6,6 @@
  * changes actually persist across staff/manager/admin, who are on separate
  * devices in real use.
  */
-import { DUMMY_CUSTOMERS, findDummyCustomer } from "@/data/customers";
 import { fetchWithTimeout, readJsonSafe } from "./http";
 
 export type LeadStatus = "New" | "Follow-up" | "Hot" | "Negotiation" | "Booked" | "Lost";
@@ -38,27 +37,34 @@ export function isStaleLead(lead: Pick<Lead, "createdAt">, now: number): boolean
   return now - lead.createdAt > 30 * 24 * 60 * 60 * 1000;
 }
 
-/**
- * Matches on Customer ID or phone number, case/space-insensitive, exact only.
- * Never throws: a failed lookup reads the same as "no match" to the caller.
- *
- * Falls back to the dummy directory (src/data/customers.ts) whenever the API
- * can't answer — no database configured, request failed, or simply no such
- * row. That fallback is what makes the staff flow demonstrable before the
- * client's customer API exists; delete it, and this function's network path,
- * once that API is wired up.
- */
+/** Matches on Lead ID or phone number, case/space-insensitive, exact only.
+ * Never throws: a failed lookup reads the same as "no match" to the caller. */
 export async function findLead(query: string): Promise<Lead | null> {
   try {
     const res = await fetchWithTimeout(`/api/leads?query=${encodeURIComponent(query)}`);
-    if (res.ok) {
-      const data = await readJsonSafe<{ exact: Lead | null }>(res);
-      if (data?.exact) return data.exact;
-    }
+    if (!res.ok) return null;
+    const data = await readJsonSafe<{ exact: Lead | null }>(res);
+    return data?.exact ?? null;
   } catch {
-    // fall through to the dummy directory
+    return null;
   }
-  return findDummyCustomer(query);
+}
+
+/**
+ * Run only after `findLead` misses — surfaces leads that are probably the
+ * same customer under a different phone format or a typo'd/re-typed name, so
+ * staff get a chance to reuse the existing record instead of the search
+ * silently falling through to "new customer."
+ */
+export async function findSimilarLeads(query: string): Promise<Lead[]> {
+  try {
+    const res = await fetchWithTimeout(`/api/leads?query=${encodeURIComponent(query)}`);
+    if (!res.ok) return [];
+    const data = await readJsonSafe<{ similar: Lead[] }>(res);
+    return Array.isArray(data?.similar) ? data.similar : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -148,19 +154,14 @@ export async function deleteLead(leadId: string): Promise<boolean> {
   }
 }
 
-/** Full lead directory for the admin/manager Leads tab. Falls back to the
- * dummy directory for the same reason `findLead` does — so the tab shows the
- * customers the staff flow can actually be demonstrated with, rather than an
- * empty table, until the real API is wired up. */
+/** Full lead directory for the admin/manager Leads tab. */
 export async function listLeads(): Promise<Lead[]> {
   try {
     const res = await fetchWithTimeout("/api/leads?all=1");
-    if (res.ok) {
-      const data = await readJsonSafe<{ leads: Lead[] }>(res);
-      if (Array.isArray(data?.leads) && data.leads.length > 0) return data.leads;
-    }
+    if (!res.ok) return [];
+    const data = await readJsonSafe<{ leads: Lead[] }>(res);
+    return Array.isArray(data?.leads) ? data.leads : [];
   } catch {
-    // fall through to the dummy directory
+    return [];
   }
-  return DUMMY_CUSTOMERS;
 }

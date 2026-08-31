@@ -1,6 +1,6 @@
 import { PropertyShowcase } from "@/components/PropertyShowcase";
-import { showcaseProjects } from "@/data/properties";
+import { properties } from "@/data/properties";
 
 export default function Dashboard() {
-  return <PropertyShowcase properties={showcaseProjects} />;
+  return <PropertyShowcase properties={properties} />;
 }

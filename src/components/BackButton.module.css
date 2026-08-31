@@ -6,22 +6,20 @@
   height: 34px;
   flex: none;
   font-size: 15px;
-  color: var(--ink);
-  background: var(--scrim);
+  color: #fff;
+  background: rgba(10, 11, 18, 0.6);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--line-strong);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: var(--edge-top), var(--shadow-md);
-  transition: background var(--t) var(--ease), border-color var(--t) var(--ease),
-    color var(--t) var(--ease), transform var(--t-fast) var(--ease);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 8px 20px -10px rgba(0, 0, 0, 0.7);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .back:hover {
-  color: var(--brass-pale);
-  background: var(--brass-ghost);
-  border-color: var(--brass);
+  background: rgba(125, 148, 240, 0.32);
+  border-color: rgba(125, 148, 240, 0.65);
 }
 
 .back:active {
